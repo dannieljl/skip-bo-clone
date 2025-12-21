@@ -1,24 +1,59 @@
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 import { setupSockets } from './socket/setup.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const fastify = Fastify({
-    logger: {
-        transport: {
-            target: 'pino-pretty' // Para que los logs sean legibles en la consola
+    logger: process.env.NODE_ENV !== 'production'
+        ? {
+            transport: {
+                target: 'pino-pretty'
+            }
         }
-    }
+        : true
 });
 
 const start = async () => {
     try {
-        // Registrar Sockets
+        // ✅ CORS (DEBE ir antes de sockets)
+        await fastify.register(cors, {
+            origin: (origin, cb) => {
+                const allowedOrigins = [
+                    'http://localhost:4200', // Angular dev
+                    'http://127.0.0.1:4200',
+                    process.env.FRONTEND_URL // Producción (AWS)
+                ];
+
+                // Permitir requests sin origin (Postman, curl, health checks)
+                if (!origin) {
+                    cb(null, true);
+                    return;
+                }
+
+                if (allowedOrigins.includes(origin)) {
+                    cb(null, true);
+                } else {
+                    cb(new Error('Not allowed by CORS'), false);
+                }
+            },
+            credentials: true
+        });
+
+        // 🔌 Registrar Sockets
         await setupSockets(fastify);
 
-        // Arrancar Servidor
         const port = Number(process.env.PORT) || 3000;
-        await fastify.listen({ port, host: '0.0.0.0' });
+        const host = process.env.HOST || '0.0.0.0';
 
-        console.log(`🚀 Servidor Skip-Bo corriendo en http://localhost:${port}`);
+        await fastify.listen({ port, host });
+
+        console.log(
+            `🚀 Servidor Skip-Bo corriendo en ${
+                host === '0.0.0.0' ? 'http://localhost' : host
+            }:${port}`
+        );
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
