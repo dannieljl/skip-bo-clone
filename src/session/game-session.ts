@@ -6,6 +6,8 @@ export class GameSession {
     private deck: Deck;
     private state: GameState;
     private readonly initialGoalSize: number;
+    private playerSockets: Map<string, string> = new Map(); // <playerId, socketId>
+
 
     constructor(gameId: string, p1Name: string, p1Id: string, goalPileSize: number = 20) {
         this.deck = new Deck();
@@ -26,27 +28,62 @@ export class GameSession {
         };
     }
 
-    public join(playerId: string, p2Name: string): void {
-        // 1. Si el jugador ya es el Jugador 1 (el creador) reconectando
+
+    /**
+     * Gestiona la entrada de jugadores a la sesión.
+     * Soporta reconexiones automáticas detectando si el playerId ya existe.
+     */
+    public join(playerId: string, playerName: string): void {
+        // Caso 1: El Creador (Jugador 1) se está reconectando
         if (this.state.me.id === playerId) {
-            console.log(`Jugador 1 (${p2Name}) reconectado`);
+            console.log(`[Session] Creator reconnected: ${playerName} (${playerId})`);
+
+            // Actualizamos el nombre por si decidió cambiarlo al volver
+            this.state.me.name = playerName;
+
+            // Si el juego estaba en pausa o esperando, podrías cambiar el status aquí
+            // pero generalmente el status se mantiene en 'playing' o 'waiting'
             return;
         }
 
-        // 2. Si el jugador ya es el Jugador 2 (el oponente) reconectando
+        // Caso 2: El Oponente (Jugador 2) ya existía y se está reconectando
         if (this.state.opponent && this.state.opponent.id === playerId) {
-            console.log(`Jugador 2 (${p2Name}) reconectado`);
+            console.log(`[Session] Opponent reconnected: ${playerName} (${playerId})`);
+
+            // Actualizamos el nombre por si acaso
+            this.state.opponent.name = playerName;
             return;
         }
 
-        // 3. Solo si NO hay oponente, lo registramos como nuevo
+        // Caso 3: Es un nuevo jugador intentando unirse como oponente
         if (!this.state.opponent) {
-            this.state.opponent = this.initPlayer(playerId, p2Name);
+            console.log(`[Session] New opponent joining: ${playerName}`);
+
+            this.state.opponent = this.initPlayer(playerId, playerName);
             this.state.status = 'playing';
+
+            // Inicializamos las cartas solo la primera vez que se completa la pareja
             this.setupInitialGame();
-            console.log(`Nuevo oponente unido: ${p2Name}`);
+            return;
+        }
+
+        // Caso 4: La partida ya está llena (intento de un tercer jugador)
+        if (this.state.me.id !== playerId && this.state.opponent.id !== playerId) {
+            console.warn(`[Session] Access denied: Game ${this.state.gameId} is already full.`);
+            // Aquí podrías lanzar un error o manejarlo en el handler
         }
     }
+
+    /**
+     * Método auxiliar para verificar si un jugador pertenece a esta sesión
+     * (Útil para el handler de restore_session)
+     */
+    public isPlayerInGame(playerId: string): boolean {
+        const isMe = this.state.me && this.state.me.id === playerId;
+        const isOpponent = this.state.opponent && this.state.opponent.id === playerId;
+        return isMe || isOpponent;
+    }
+
 
     private initPlayer(id: string, name: string): PlayerState {
         return {
