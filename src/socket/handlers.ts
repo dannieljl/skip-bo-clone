@@ -18,9 +18,9 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
     }
 
     // 1. CREAR PARTIDA
-    socket.on('create_game', (data: { playerName: string, goalSize: number }) => {
+    socket.on('create_game', (data: { playerId: string, playerName: string, goalSize: number }) => {
         const session = gameManager.createGame(
-            socket.id,
+            data.playerId,
             data.playerName,
             data.goalSize || 20
         );
@@ -28,11 +28,11 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
         const gameId = session.getGameState(socket.id).gameId;
         socket.join(gameId);
         socket.emit('game_state', session.getGameState(socket.id));
-        console.log(`✅ Juego creado: ${gameId}`);
+
     });
 
     // 2. UNIRSE A PARTIDA
-    socket.on('join_game', async (data: { gameId: string, playerName: string }) => {
+    socket.on('join_game', async (data: { gameId: string, playerId: string, playerName: string }) => {
         const session = gameManager.getGame(data.gameId);
 
         if (!session) {
@@ -40,9 +40,9 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
         }
 
         socket.join(data.gameId);
-        session.join(socket.id, data.playerName);
+        session.join(data.playerId, data.playerName);
 
-        await broadcastGameState(data.gameId);
+        await broadcastGameState(data.playerId);
         console.log(`👤 ${data.playerName} se unió`);
     });
 
