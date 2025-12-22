@@ -23,33 +23,33 @@ export class GameSession {
             pilesToRecycleCount: 0,
             winnerId: undefined
         };
+        console.log(`[Session] 🟢 Partida creada: ${gameId} por ${p1Name} (${p1Id})`);
     }
 
     public join(playerId: string, playerName: string): void {
-        // Caso 1: El Creador (P1) se reconecta
-        if (this.state.me.id === playerId) {
-            console.log(`[Session] P1 reconectado. Manteniendo 'waiting'.`);
-            this.state.me.name = playerName;
+        console.log(`\n--- 📥 Intento de Join [Game: ${this.state.gameId}] ---`);
+
+        // Caso 1: El Creador (P1) o el Oponente (P2) ya existente se reconecta
+        const isP1 = this.state.me.id === playerId;
+        const isP2 = this.state.opponent && this.state.opponent.id === playerId;
+
+        if (isP1 || isP2) {
+            console.log(`   ✅ Jugador ${isP1 ? 'P1' : 'P2'} reconectado: ${playerName} (${playerId})`);
+            if (isP1) this.state.me.name = playerName;
+            else if (this.state.opponent) this.state.opponent.name = playerName;
             return;
         }
 
-        // Caso 2: El Oponente (P2) ya existía y se reconecta
-        if (this.state.opponent && this.state.opponent.id === playerId) {
-            console.log(`[Session] P2 reconectado.`);
-            this.state.opponent.name = playerName;
-            return;
-        }
-
-        // Caso 3: Es un nuevo oponente (ID distinto a P1)
-        if (this.state.status === 'waiting' && this.state.me.id !== playerId) {
-            console.log(`[Session] P2 unido. Iniciando partida.`);
+        // Caso 2: Es un nuevo oponente (ID distinto a P1) y la partida espera
+        if (this.state.status === 'waiting' && !this.state.opponent) {
+            console.log(`   🚀 P2 unido por primera vez: ${playerName} (${playerId}). Iniciando partida.`);
             this.state.opponent = this.initPlayer(playerId, playerName);
             this.state.status = 'playing';
             this.setupInitialGame();
             return;
         }
 
-        console.warn(`[Session] Join rechazado. Player: ${playerId}, Status: ${this.state.status}`);
+        console.warn(`   ❌ Intento de unión rechazado. Player: ${playerId}, Status Actual: ${this.state.status}`);
     }
 
     public isPlayerInGame(playerId: string): boolean {
@@ -72,8 +72,15 @@ export class GameSession {
     }
 
     public playCard(playerId: string, payload: PlayCardPayload): boolean {
-        if (this.state.currentPlayerId !== playerId || this.state.status !== 'playing') return false;
-        const player = this.state.me.id === playerId ? this.state.me : this.state.opponent;
+        const isP1 = this.state.me.id === playerId;
+        const playerTag = isP1 ? 'P1' : 'P2';
+
+        if (this.state.currentPlayerId !== playerId || this.state.status !== 'playing') {
+            console.warn(`[Move] ⛔ Intento de ${playerTag} fuera de turno.`);
+            return false;
+        }
+
+        const player = isP1 ? this.state.me : this.state.opponent;
         const targetPile = this.state.commonPiles[payload.targetIndex];
         if (!targetPile) return false;
 
@@ -90,7 +97,10 @@ export class GameSession {
             if (slot && slot.length > 0) card = slot[slot.length - 1];
         }
 
-        if (!card || card.id !== payload.cardId) return false;
+        if (!card || card.id !== payload.cardId) {
+            console.warn(`[Move] ❌ Carta no encontrada: ${payload.cardId} en ${payload.source}`);
+            return false;
+        }
 
         if (SkipBoEngine.isValidMove(targetPile, card)) {
             if (payload.source === 'hand') player.hand.splice(cardIdx, 1);
@@ -98,6 +108,7 @@ export class GameSession {
                 player.goalPile.pop();
                 player.goalRemaining = player.goalPile.length;
                 if (player.goalRemaining === 0) {
+                    console.log(`[Game] 🏆 ¡${player.name} (${playerTag}) ha ganado!`);
                     this.state.status = 'finished';
                     this.state.winnerId = playerId;
                 }
@@ -106,20 +117,34 @@ export class GameSession {
             }
 
             targetPile.push(card);
+            console.log(`[Move] ✅ ${playerTag} jugó ${card.value} en pila ${payload.targetIndex}`);
+
             if (SkipBoEngine.isPileComplete(targetPile)) {
                 this.deck.pushToPending(targetPile);
                 this.state.commonPiles[payload.targetIndex] = [];
             }
-            if (player.hand.length === 0 && this.state.status === 'playing') player.hand = this.deck.draw(5);
+            if (player.hand.length === 0 && this.state.status === 'playing') {
+                console.log(`[Game] 🃏 ${playerTag} mano vacía, robando 5 cartas.`);
+                player.hand = this.deck.draw(5);
+            }
             this.state.drawPileCount = this.deck.count;
             return true;
         }
+
+        console.warn(`[Move] ❌ Movimiento inválido de ${playerTag}: ${card.value} sobre pila ${payload.targetIndex}`);
         return false;
     }
 
     public discard(playerId: string, payload: DiscardCardPayload): boolean {
-        if (this.state.currentPlayerId !== playerId || this.state.status !== 'playing') return false;
-        const player = this.state.me.id === playerId ? this.state.me : this.state.opponent;
+        const isP1 = this.state.me.id === playerId;
+        const playerTag = isP1 ? 'P1' : 'P2';
+
+        if (this.state.currentPlayerId !== playerId || this.state.status !== 'playing') {
+            console.warn(`[Discard] ⛔ ${playerTag} intentó descartar fuera de turno.`);
+            return false;
+        }
+
+        const player = isP1 ? this.state.me : this.state.opponent;
         const cardIdx = player.hand.findIndex(c => c.id === payload.cardId);
         if (cardIdx === -1 || payload.targetIndex < 0 || payload.targetIndex > 3) return false;
         const targetSlot = player.discards[payload.targetIndex];
@@ -130,11 +155,17 @@ export class GameSession {
         if (!cardToDiscard) return false;
         targetSlot.push(cardToDiscard);
 
+        console.log(`[Discard] 🗑️ ${playerTag} descartó en slot ${payload.targetIndex}.`);
+
         this.state.currentPlayerId = (this.state.me.id === playerId) ? this.state.opponent.id : this.state.me.id;
         const nextPlayer = this.state.currentPlayerId === this.state.me.id ? this.state.me : this.state.opponent;
+
         if (nextPlayer && nextPlayer.hand.length < 5) {
-            nextPlayer.hand.push(...this.deck.draw(5 - nextPlayer.hand.length));
+            const toDraw = 5 - nextPlayer.hand.length;
+            console.log(`[Game] 🃏 Siguiente turno: ${nextPlayer.id}. Robando ${toDraw} cartas.`);
+            nextPlayer.hand.push(...this.deck.draw(toDraw));
         }
+
         this.state.drawPileCount = this.deck.count;
         return true;
     }

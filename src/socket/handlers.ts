@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { Socket } from 'socket.io';
 import { gameManager } from '../session/game-manager.js';
-import { CardSource, PlayCardPayload } from '../core/types.js';
+import { CardSource } from '../core/types.js';
 
 interface CustomSocket extends Socket { playerId?: string; }
 
@@ -14,7 +14,9 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
         const sockets = await fastify.io.in(gameId).fetchSockets();
         sockets.forEach((remoteSocket) => {
             const pid = (remoteSocket as any).playerId;
-            if (pid) remoteSocket.emit('game_state', session.getGameState(pid));
+            if (pid) {
+                remoteSocket.emit('game_state', session.getGameState(pid));
+            }
         });
     }
 
@@ -23,45 +25,50 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
         s.playerId = data.playerId;
         socket.join(session.state.gameId);
         socket.emit('game_state', session.getGameState(data.playerId));
-        console.log(`✨ Partida creada: ${session.state.gameId}`);
+        console.log(`✨ Partida Creada en Servidor: ${session.state.gameId}`);
     });
 
     socket.on('join_game', async (data: { gameId: string, playerId: string, playerName: string }) => {
         const session = gameManager.getGame(data.gameId);
-        if (!session) return socket.emit('error', 'No existe la partida');
+        if (!session) {
+            console.log(`⚠️ Intento de unión a partida inexistente: ${data.gameId}`);
+            return socket.emit('error', 'No existe la partida o ya ha terminado.');
+        }
+
         s.playerId = data.playerId;
         socket.join(data.gameId);
         session.join(data.playerId, data.playerName);
+
         await broadcastGameState(data.gameId);
     });
 
     socket.on('play_card', async (data: any) => {
         const session = gameManager.getGame(data.gameId);
         if (!session) return;
+
         const success = session.playCard(data.playerId, {
             cardId: data.cardId,
             source: data.source as CardSource,
             targetIndex: data.targetIndex,
             sourceIndex: data.sourceIndex
         });
+
         if (success) await broadcastGameState(data.gameId);
-        else socket.emit('error', 'Movimiento inválido');
+        else socket.emit('error', 'Movimiento no permitido');
     });
 
     socket.on('discard_card', async (data: any) => {
         const session = gameManager.getGame(data.gameId);
         if (!session) return;
+
         if (session.discard(data.playerId, { cardId: data.cardId, targetIndex: data.targetIndex })) {
             await broadcastGameState(data.gameId);
         }
     });
 
-    socket.on('restore_session', async (data: any) => {
-        const session = gameManager.getGame(data.gameId);
-        if (session && session.isPlayerInGame(data.playerId)) {
-            s.playerId = data.playerId;
-            socket.join(data.gameId);
-            socket.emit('game_state', session.getGameState(data.playerId));
+    socket.on('disconnect', () => {
+        if (s.playerId) {
+            console.log(`🔌 Cliente desconectado del socket: ${socket.id} (Jugador ID: ${s.playerId})`);
         }
     });
 }
