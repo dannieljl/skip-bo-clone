@@ -34,10 +34,16 @@ export class GameSession {
      * Soporta reconexiones automáticas detectando si el playerId ya existe.
      */
     public join(playerId: string, playerName: string): void {
+
+        console.log('--- [DEBUG JOIN] ---');
+        console.log(`Llega ID: "${playerId}"`);
+        console.log(`ID Creador (Me): "${this.state.me.id}"`);
+        console.log(`¿Son idénticos?: ${this.state.me.id === playerId}`);
+
+
         // Caso 1: El Creador (Jugador 1) se está reconectando
         if (this.state.me.id === playerId) {
-            console.log(`[Session] Creator reconnected: ${playerName} (${playerId})`);
-
+            console.log(`✅ MATCH: Oponente ${playerName} reconectado.`);
             // Actualizamos el nombre por si decidió cambiarlo al volver
             this.state.me.name = playerName;
 
@@ -48,8 +54,7 @@ export class GameSession {
 
         // Caso 2: El Oponente (Jugador 2) ya existía y se está reconectando
         if (this.state.opponent && this.state.opponent.id === playerId) {
-            console.log(`[Session] Opponent reconnected: ${playerName} (${playerId})`);
-
+            console.log(`✅ MATCH: Oponente ${playerName} reconectado.`);
             // Actualizamos el nombre por si acaso
             this.state.opponent.name = playerName;
             return;
@@ -57,12 +62,9 @@ export class GameSession {
 
         // Caso 3: Es un nuevo jugador intentando unirse como oponente
         if (!this.state.opponent) {
-            console.log(`[Session] New opponent joining: ${playerName}`);
-
+            console.log(`🚀 NO MATCH: Iniciando juego para nuevo oponente: ${playerName}`);
             this.state.opponent = this.initPlayer(playerId, playerName);
             this.state.status = 'playing';
-
-            // Inicializamos las cartas solo la primera vez que se completa la pareja
             this.setupInitialGame();
             return;
         }
