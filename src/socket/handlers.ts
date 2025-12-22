@@ -36,7 +36,7 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
         const session = gameManager.getGame(data.gameId);
 
         if (!session) {
-            return socket.emit('error', { message: 'Partida no encontrada' });
+            return socket.emit('error', { message: 'Game not found' });
         }
 
         socket.join(data.gameId);

@@ -26,12 +26,26 @@ export class GameSession {
         };
     }
 
-    public join(p2Id: string, p2Name: string): void {
-        if (this.state.opponent) return;
+    public join(playerId: string, p2Name: string): void {
+        // 1. Si el jugador ya es el Jugador 1 (el creador) reconectando
+        if (this.state.me.id === playerId) {
+            console.log(`Jugador 1 (${p2Name}) reconectado`);
+            return;
+        }
 
-        this.state.opponent = this.initPlayer(p2Id, p2Name);
-        this.state.status = 'playing';
-        this.setupInitialGame();
+        // 2. Si el jugador ya es el Jugador 2 (el oponente) reconectando
+        if (this.state.opponent && this.state.opponent.id === playerId) {
+            console.log(`Jugador 2 (${p2Name}) reconectado`);
+            return;
+        }
+
+        // 3. Solo si NO hay oponente, lo registramos como nuevo
+        if (!this.state.opponent) {
+            this.state.opponent = this.initPlayer(playerId, p2Name);
+            this.state.status = 'playing';
+            this.setupInitialGame();
+            console.log(`Nuevo oponente unido: ${p2Name}`);
+        }
     }
 
     private initPlayer(id: string, name: string): PlayerState {
