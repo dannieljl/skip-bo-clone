@@ -11,8 +11,12 @@ interface GameEventBase {
     playerId: string;
 }
 
-export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
+interface CustomSocket extends Socket {
+    playerId?: string;
+}
 
+export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
+    const s = socket as CustomSocket;
     /**
      * Envía el estado personalizado a cada jugador en la sala.
      */
@@ -22,12 +26,12 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
 
         const sockets = await fastify.io.in(gameId).fetchSockets();
 
-        sockets.forEach((s) => {
+        sockets.forEach((remoteSocket) => {
             // Recuperamos el playerId que guardamos en el socket al conectar/unirse
-            const pid = (s as any).playerId;
+            const pid = (remoteSocket as any).playerId;
             if (pid) {
                 const personalizedState = session.getGameState(pid);
-                s.emit('game_state', personalizedState);
+                remoteSocket.emit('game_state', personalizedState);
             }
         });
     }

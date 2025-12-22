@@ -31,21 +31,20 @@ export class GameSession {
 
         // Caso 1: El Creador (P1) se está reconectando
         if (this.state.me.id === playerId) {
-            console.log(`[Session] Creador (P1) reconectado: ${playerId}`);
-            this.state.me.name = playerName;
+            console.log(`[Session] Dueño (P1) regresó. Esperando oponente...`); this.state.me.name = playerName;
             return;
         }
 
         // Caso 2: El Oponente (P2) ya existía y se reconecta
         if (this.state.opponent && this.state.opponent.id === playerId) {
-            console.log(`[Session] Oponente (P2) reconectado: ${playerId}`);
+            console.log(`[Session] Oponente (P2) regresó.`);
             this.state.opponent.name = playerName;
             return;
         }
 
         // Caso 3: Es un nuevo oponente y la partida está esperando (Candado de inicio)
         if (!this.state.opponent && this.state.status === 'waiting') {
-            console.log(`[Session] Nuevo oponente unido. Iniciando partida...`);
+            console.log(`[Session] ¡Oponente detectado! Repartiendo cartas...`);
             this.state.opponent = this.initPlayer(playerId, playerName);
             this.state.status = 'playing';
             this.setupInitialGame();
@@ -53,6 +52,12 @@ export class GameSession {
         }
 
         console.warn(`[Session] Petición de unión ignorada. Status: ${this.state.status}`);
+    }
+
+    public isPlayerInGame(playerId: string): boolean {
+        const isP1 = this.state.me && this.state.me.id === playerId;
+        const isP2 = this.state.opponent && this.state.opponent.id === playerId;
+        return !!(isP1 || isP2);
     }
 
     private initPlayer(id: string, name: string): PlayerState {
