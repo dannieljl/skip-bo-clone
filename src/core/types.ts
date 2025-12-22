@@ -47,6 +47,7 @@ export interface GameState {
     opponent: PlayerState;
     drawPileCount: number; // Solo enviamos el número de cartas restantes en el mazo de robo
     pilesToRecycleCount: number; // <--- Añade esta línea
+    winnerId?: string | undefined;
 }
 
 /**

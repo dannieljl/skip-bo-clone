@@ -22,6 +22,7 @@ export class GameSession {
             opponent: null as any,
             drawPileCount: 0,
             pilesToRecycleCount: 0,
+            winnerId: undefined // Inicializado como undefined
         };
     }
 
@@ -57,6 +58,7 @@ export class GameSession {
     }
 
     public playCard(playerId: string, payload: PlayCardPayload): boolean {
+        // No permitir jugadas si el juego ya terminó o no es el turno
         if (this.state.currentPlayerId !== playerId || this.state.status !== 'playing') return false;
 
         const player = this.state.me.id === playerId ? this.state.me : this.state.opponent;
@@ -80,7 +82,7 @@ export class GameSession {
             }
         }
 
-        // 2. Validación de existencia (Type Guard para evitar TS2345)
+        // 2. Validación de existencia
         if (!card || card.id !== payload.cardId) return false;
 
         // 3. Validar reglas de Skip-Bo con el Engine
@@ -92,7 +94,12 @@ export class GameSession {
             } else if (payload.source === 'goal') {
                 player.goalPile.pop();
                 player.goalRemaining = player.goalPile.length;
-                if (player.goalRemaining === 0) this.state.status = 'finished';
+
+                // --- LÓGICA DE VICTORIA ---
+                if (player.goalRemaining === 0) {
+                    this.state.status = 'finished';
+                    this.state.winnerId = playerId;
+                }
             } else if (payload.source === 'discard' && typeof payload.sourceIndex === 'number') {
                 player.discards[payload.sourceIndex]?.pop();
             }
@@ -102,18 +109,13 @@ export class GameSession {
 
             // 6. Limpiar si la pila llega a 12
             if (SkipBoEngine.isPileComplete(targetPile)) {
-                // 1. Mandar la pila al mazo (se encarga de acumular 3)
                 this.deck.pushToPending(targetPile);
-
-                // 2. Vaciar la pila de la mesa
                 this.state.commonPiles[payload.targetIndex] = [];
-
-                // 3. Actualizar contadores del estado
                 this.state.drawPileCount = this.deck.count;
                 this.state.pilesToRecycleCount = this.deck.pendingCount;
             }
 
-            // 7. Rellenar mano si quedó vacía (Regla: roba 5 nuevas)
+            // 7. Rellenar mano si quedó vacía (solo si el juego sigue activo)
             if (player.hand.length === 0 && this.state.status === 'playing') {
                 player.hand = this.deck.draw(5);
             }
@@ -130,19 +132,16 @@ export class GameSession {
         const player = this.state.me.id === playerId ? this.state.me : this.state.opponent;
         const cardIdx = player.hand.findIndex(c => c.id === payload.cardId);
 
-        // Validaciones básicas
         if (cardIdx === -1 || payload.targetIndex < 0 || payload.targetIndex > 3) return false;
 
         const targetSlot = player.discards[payload.targetIndex];
-        if (!targetSlot) return false; // Evita TS2532
+        if (!targetSlot) return false;
 
-        // Extraer carta de forma segura para evitar TS2345
         const extracted = player.hand.splice(cardIdx, 1);
         const cardToDiscard = extracted[0];
 
         if (!cardToDiscard) return false;
 
-        // Realizar el descarte
         targetSlot.push(cardToDiscard);
 
         // --- CAMBIO DE TURNO ---
@@ -177,14 +176,11 @@ export class GameSession {
             me: me,
             pilesToRecycleCount: this.deck.pendingCount,
             drawPileCount: this.deck.count,
+            winnerId: this.state.winnerId, // Se envía el ganador o undefined
             opponent: opponent ? {
                 ...opponent,
-                // 1. Ocultamos la mano completa (siempre es secreta)
                 hand: Array(opponent.hand.length).fill(null),
-
-                // 2. Mantenemos la longitud de la Goal Pile, pero solo revelamos la última carta
                 goalPile: opponent.goalPile.map((card, index) => {
-                    // Si es la última carta de la pila, la enviamos real; si no, mandamos null
                     return index === opponent.goalPile.length - 1 ? card : null;
                 })
             } : null as any
