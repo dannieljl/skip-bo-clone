@@ -124,7 +124,7 @@ export class GameSession {
                 this.state.commonPiles[payload.targetIndex] = [];
             }
             if (player.hand.length === 0 && this.state.status === 'playing') {
-                console.log(`[Game] 🃏 ${playerTag} mano vacía, robando 5 cartas.`);
+                console.log(`[Game] 🃏 ${playerTag} mano vacía, repartiendo 5 cartas.`);
                 player.hand = this.deck.draw(5);
             }
             this.state.drawPileCount = this.deck.count;
