@@ -66,9 +66,41 @@ export function handleSocketEvents(fastify: FastifyInstance, socket: Socket) {
         }
     });
 
+    // NUEVO EVENTO
+    socket.on('rps_choice', async (data: { gameId: string, playerId: string, choice: 'rock'|'paper'|'scissors' }) => {
+        const session = gameManager.getGame(data.gameId);
+        if (!session) return;
+
+        const result = session.playRPS(data.playerId, data.choice);
+
+        if (result) {
+            // 1. Emitir estado inmediato (Muestra elección o resultado 'Draw'/'Win')
+            await broadcastGameState(data.gameId);
+
+            // 2. Si hubo resultado (Draw o Win), esperamos y luego avanzamos
+            if (result !== 'continue') {
+                setTimeout(async () => {
+                    if (result === 'draw') {
+                        // Reseteamos para nueva ronda
+                        session.resetRPSRound();
+                        // 📢 IMPORTANTE: Avisamos a todos que se reseteó
+                        await broadcastGameState(data.gameId);
+                    } else {
+                        // Finalizamos e iniciamos partida
+                        session.finalizeRPS();
+                        // 📢 IMPORTANTE: Avisamos que el juego empezó
+                        await broadcastGameState(data.gameId);
+                    }
+                }, 3000); // 3 segundos para ver la animación
+            }
+        }
+
+    });
+
     socket.on('disconnect', () => {
         if (s.playerId) {
             console.log(`🔌 Cliente desconectado del socket: ${socket.id} (Jugador ID: ${s.playerId})`);
         }
     });
+
 }

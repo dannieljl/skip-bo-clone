@@ -50,7 +50,7 @@ const start = async () => {
         await fastify.listen({ port, host });
 
         console.log(
-            `🚀 Servidor Skip-Bo v1.0.0 run in ${
+            `🚀 Servidor Skip-Bo v2.7.7 run in ${
                 host === '0.0.0.0' ? 'http://localhost' : host
             }:${port}`
         );

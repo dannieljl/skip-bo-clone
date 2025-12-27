@@ -41,13 +41,14 @@ export interface PlayerState {
 export interface GameState {
     gameId: string;
     currentPlayerId: string;
-    status: 'playing' | 'finished' | 'waiting';
+    status: 'playing' | 'resolving_tie'| 'finished' | 'waiting';
     commonPiles: Card[][]; // Las 4 pilas centrales donde se construye del 1 al 12
     me: PlayerState;
     opponent: PlayerState;
     drawPileCount: number; // Solo enviamos el número de cartas restantes en el mazo de robo
     pilesToRecycleCount: number; // <--- Añade esta línea
     winnerId?: string | undefined;
+    tieBreaker?: TieBreakerState;
 }
 
 /**
@@ -67,3 +68,25 @@ export interface DiscardCardPayload {
     cardId: string;
     targetIndex: number; // Cuál de los 4 slots de descarte (0-3)
 }
+
+export type RPSChoice = 'rock' | 'paper' | 'scissors' | null;
+
+/**
+ * Estado del minijuego de desempate
+ */
+export interface TieBreakerState {
+    p1Choice: RPSChoice;
+    p2Choice: RPSChoice;
+    player1Id: string; // ✅ NUEVO: Necesario para que el front sepa quién es P1
+    player2Id: string; // ✅ NUEVO
+    lastResult: 'draw' | 'p1_wins' | 'p2_wins' | null; // Para mostrar feedback visual
+    roundId: number;
+}
+
+/**
+ * Payload para enviar la jugada de RPS
+ */
+export interface RPSPayload {
+    choice: 'rock' | 'paper' | 'scissors';
+}
+
