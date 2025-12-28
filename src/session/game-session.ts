@@ -80,16 +80,6 @@ export class GameSession {
             return; // O maneja el error según tu lógica de juego
         }
 
-        // 🚨 DEBUG HACK: FORZAR EMPATE 🚨
-        console.log("⚠️ DEBUG: Forzando empate para probar RPS");
-        p1Card.value = 5;
-        p1Card.displayColor = 'green'; // <--- FORZAMOS EL COLOR TAMBIÉN
-
-        // P2
-        p2Card.value = 5;
-        p2Card.displayColor = 'green';
-
-
         // Nota: Asumimos que los Comodines (value 0) son los más bajos y ganan la salida.
         console.log(`[Start] Comparando: P1(${p1Card.value}) vs P2(${p2Card.value})`);
 
